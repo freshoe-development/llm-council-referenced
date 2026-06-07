@@ -1,0 +1,21 @@
+# LLM Council — public HTTPS vhost (Caddy v2).
+#
+# Appended to /etc/caddy/Caddyfile on the Hostinger VPS
+# (srv1357811 / 72.61.193.40). Caddy auto-provisions a Let's Encrypt
+# certificate for this hostname (global `email` is already set in the Caddyfile).
+#
+# The app binds 127.0.0.1:8000 (loopback only) and is reachable ONLY through this
+# reverse proxy. Protected endpoints (/v1/council/*) enforce Bearer auth via
+# LLM_COUNCIL_API_TOKEN (set in the server-side .env, never committed). /health is
+# open. No firewall change is needed: 80/443 are already open; 8000 stays loopback.
+#
+# Apply:
+#   cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak
+#   cat deploy/caddy/council.Caddyfile >> /etc/caddy/Caddyfile
+#   caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile
+#   systemctl reload caddy
+
+council.72-61-193-40.nip.io {
+    encode gzip
+    reverse_proxy 127.0.0.1:8000
+}

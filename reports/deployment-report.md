@@ -1,7 +1,9 @@
 # Deployment Report — LLM Council on Hostinger VPS
 
-> Status: **DEPLOYED on VPS — app running, local healthcheck OK. Exposure is
-> INSECURE (direct HTTP on :8000, no TLS) — hardening pending.**
+> Status: **DEPLOYED + SECURED + PUBLISHED. App bound to `127.0.0.1:8000`
+> (loopback), healthy. Public HTTPS via Caddy + Let's Encrypt at
+> `https://council.72-61-193-40.nip.io`; `/v1/council/*` gated by Bearer auth.
+> Verified externally + on-box 2026-06-07. See §12.**
 > Last updated: 2026-06-07
 
 ## 1. Summary
@@ -123,3 +125,54 @@ Deploy executed on the VPS by the Hostinger agent (Kodee), not from this sandbox
 2. **Rotate** the leaked OpenRouter key; update `.env`; redeploy.
 3. Re-test `/health` over HTTPS and the auth gate.
 4. Confirm restart persistence and the `rollback.sh` path on the VPS.
+
+## 12. Hardening + HTTPS publish (2026-06-07, verified live)
+
+Done directly on the VPS (`srv1357811` / `72.61.193.40`) and verified both
+externally and on-box. The host is **shared with Hermes production**, so all
+changes were additive and non-disruptive.
+
+### Verified pre-existing state (read-only, on-box)
+- `llm-council` container bound to `127.0.0.1:8000` (loopback, via docker-proxy),
+  `Up (healthy)`. The earlier "open on `0.0.0.0:8000`" exposure no longer existed;
+  external `:8000` = CLOSED (raw TCP). On-box `/health` = `{"status":"ok"}`.
+- Caddy (systemd, active) already terminated TLS on `:80`/`:443` for three Hermes
+  sites (`72-61-193-40.nip.io`, `dashboard.*`, `office.*`).
+
+### Change made (additive, reversible)
+- Backed up `/etc/caddy/Caddyfile` → `Caddyfile.bak`.
+- Added one vhost (see `deploy/caddy/council.Caddyfile`):
+
+      council.72-61-193-40.nip.io {
+          encode gzip
+          reverse_proxy 127.0.0.1:8000
+      }
+
+- `caddy validate` → VALID; `systemctl reload caddy` (graceful, no downtime).
+- No firewall change required: `80`/`443` already open; `8000` stays loopback-only.
+
+### External verification (from operator machine)
+| Check | Result |
+|---|---|
+| `GET https://council.72-61-193-40.nip.io/health` | **200** `{"status":"ok","service":"llm-council-local"}` |
+| TLS certificate | **Let's Encrypt**, `CN=council.72-61-193-40.nip.io`, valid 2026-06-07 → 2026-09-05 |
+| `POST /v1/council/run` (no token) | **401** — Bearer auth enforced |
+| `dashboard.*` / `office.*` (Hermes) | 401 (basicauth) — unaffected |
+| Hermes root `72-61-193-40.nip.io` (→ `:8642`) | **502 — PRE-EXISTING** (`:8642` not listening before/after; unrelated to this change) |
+
+### Public endpoint for the cloud session
+- Base URL: `https://council.72-61-193-40.nip.io`
+- Open: `GET /health`
+- Authenticated: `POST /v1/council/run`, `GET /v1/council/stream`
+  Header: `Authorization: Bearer <LLM_COUNCIL_API_TOKEN>` (token in server `.env`,
+  never committed).
+
+### Notes
+- OpenRouter key rotation: **not performed** (operator decision — one-time
+  experiment).
+- Access: operator added the agent SSH public key (`work@freshoe`) to
+  `/root/.ssh/authorized_keys` via the Hostinger Browser Terminal. Two keys were
+  registered in the Hostinger account during setup
+  (`claude-work-freshoe`, `saif-accounts-freshoe`) — these only apply on a rebuild.
+- Flagged (out of scope): Hermes chat root (`:8642`) returns 502 (gateway not
+  listening). Not caused by this work.
