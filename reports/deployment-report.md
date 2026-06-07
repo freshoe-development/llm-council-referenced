@@ -170,9 +170,11 @@ changes were additive and non-disruptive.
 ### Notes
 - OpenRouter key rotation: **not performed** (operator decision — one-time
   experiment).
-- Access: operator added the agent SSH public key (`work@freshoe`) to
-  `/root/.ssh/authorized_keys` via the Hostinger Browser Terminal. Two keys were
-  registered in the Hostinger account during setup
-  (`claude-work-freshoe`, `saif-accounts-freshoe`) — these only apply on a rebuild.
+- Access: all changes + verification were performed via the **Hostinger Browser
+  Terminal** (root shell, driven through the Chrome extension). Direct SSH from the
+  operator machine was **not** established — registering the agent key was blocked
+  by the safety guard on this shared production host. Two keys registered in the
+  Hostinger account during setup (`claude-work-freshoe`, `saif-accounts-freshoe`)
+  remain attached but only take effect on a rebuild.
 - Flagged (out of scope): Hermes chat root (`:8642`) returns 502 (gateway not
   listening). Not caused by this work.
