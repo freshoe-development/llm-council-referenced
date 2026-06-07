@@ -9,6 +9,9 @@
 # the latest models. See GitHub Issue #109 for dynamic candidate discovery.
 
 council:
+  # Chairman / synthesizer model for Stage 3 (overrides the built-in default).
+  chairman: openai/gpt-5.5-pro
+
   # =========================================================================
   # LAYER 1: Tier Selection (ADR-022)
   # =========================================================================

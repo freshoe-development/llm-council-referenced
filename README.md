@@ -46,6 +46,41 @@ Deploy your own LLM Council instance:
 
 For detailed deployment instructions, see the [Deployment Guide](https://llm-council.dev/deployment/).
 
+### Self-Host on a VPS (Hostinger) with Docker
+
+For a self-managed VPS, the project ships a production Docker setup and helper
+scripts. The app is a stateless HTTP service on **one port: 8000**.
+
+```bash
+# 1. Clone and select the deployment branch
+git clone <your-fork-url> && cd llm-council-referenced
+git checkout hostinger-deploy
+
+# 2. Create the environment file from the template, then fill in secrets.
+#    NEVER commit .env — it is git-ignored.
+cp .env.example .env
+#    Required: OPENROUTER_API_KEY and LLM_COUNCIL_API_TOKEN
+#    Generate a token with:  openssl rand -hex 32
+
+# 3. Deploy (builds, starts, records a rollback point, waits for /health)
+./scripts/deploy.sh
+
+# 4. Verify
+./scripts/healthcheck.sh        # -> http://127.0.0.1:8000/health
+
+# 5. Roll back if needed
+./scripts/rollback.sh           # to the previously deployed commit
+```
+
+**Security defaults:** `docker-compose.prod.yml` binds the port to
+`127.0.0.1` (loopback) only — the API is **not** exposed to the internet until
+you put a reverse proxy (nginx/Caddy) with TLS in front of it, or explicitly set
+`BIND_ADDR=0.0.0.0` (and add firewall rules). Without `LLM_COUNCIL_API_TOKEN`
+the council endpoints are unauthenticated; always set it for a public deploy.
+
+See [`AGENTS.md`](./AGENTS.md) for the full operational runbook, validation
+checklist, and approval gates.
+
 
 ## Credits & Attribution
 
