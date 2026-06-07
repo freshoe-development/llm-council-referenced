@@ -1,0 +1,46 @@
+# Production deployment for a single-host Docker server (e.g. Hostinger VPS).
+#
+# This is a SELF-CONTAINED production compose file — use it on its own, not as
+# an overlay, to avoid surprising port-merge behaviour with docker-compose.yml
+# (which is the local-dev file).
+#
+# Usage on the server:
+#   cp .env.example .env          # then fill in real secrets (never commit .env)
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# SECURITY:
+#   * Binds to LOOPBACK (127.0.0.1) by default, so the API is NOT reachable
+#     from the public internet without a reverse proxy. Put nginx/Caddy + TLS
+#     in front of it.
+#   * To expose the port directly to the internet, set BIND_ADDR=0.0.0.0 AND
+#     add firewall rules first (see AGENTS.md / README "Self-hosting" section).
+#   * All secrets come from .env via env_file — none are baked into the image.
+
+services:
+  llm-council:
+    build:
+      context: .
+      dockerfile: deploy/railway/Dockerfile
+      args:
+        VERSION: ${APP_VERSION:-0.0.0.dev0}
+    image: llm-council:prod
+    container_name: llm-council
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+    ports:
+      # host_bind:host_port:container_port
+      - "${BIND_ADDR:-127.0.0.1}:${PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
