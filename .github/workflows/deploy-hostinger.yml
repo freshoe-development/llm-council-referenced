@@ -38,6 +38,7 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           if [ -z "${SSH_PRIVATE_KEY:-}" ] || [ -z "${SSH_HOST:-}" ]; then
@@ -48,7 +49,16 @@ jobs:
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -p "$PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # Prefer a pinned host key (SSH_KNOWN_HOSTS secret) to avoid MITM.
+          # Fall back to ssh-keyscan only if it is not provided (with a warning).
+          if [ -n "${SSH_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+            echo "Using pinned SSH_KNOWN_HOSTS."
+          else
+            echo "::warning::SSH_KNOWN_HOSTS not set — trusting ssh-keyscan (MITM risk). Pin it for production."
+            ssh-keyscan -p "$PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          fi
+          chmod 600 ~/.ssh/known_hosts
 
       - name: Deploy over SSH
         env:
@@ -59,12 +69,22 @@ jobs:
           REF: ${{ github.event.inputs.ref }}
         run: |
           set -euo pipefail
+          # Validate inputs to a safe charset before they reach the remote shell,
+          # preventing command injection / word-splitting in the ssh command.
+          if ! printf '%s' "$REF" | grep -qE '^[A-Za-z0-9._/-]+$'; then
+            echo "::error::Invalid ref '${REF}': allowed chars are [A-Za-z0-9._/-]"
+            exit 1
+          fi
+          DIR="${APP_DIR:-~/llm-council-referenced}"
+          if ! printf '%s' "$DIR" | grep -qE '^[A-Za-z0-9._/~-]+$'; then
+            echo "::error::Invalid APP_DIR '${DIR}': allowed chars are [A-Za-z0-9._/~-]"
+            exit 1
+          fi
           PORT="${SSH_PORT:-22}"
           USER="${SSH_USER:-root}"
-          DIR="${APP_DIR:-~/llm-council-referenced}"
           echo "Deploying ref '${REF}' to ${USER}@${SSH_HOST}:${DIR}"
           ssh -p "$PORT" -o BatchMode=yes "${USER}@${SSH_HOST}" \
-            "set -e; cd ${DIR}; git fetch origin '${REF}'; git checkout '${REF}'; git pull --ff-only origin '${REF}' || true; DEPLOY_BRANCH='${REF}' ./scripts/deploy.sh"
+            "set -e; cd ${DIR}; git fetch origin '${REF}'; git checkout '${REF}'; if git symbolic-ref -q HEAD >/dev/null; then git pull --ff-only origin '${REF}' || true; fi; DEPLOY_BRANCH='${REF}' ./scripts/deploy.sh"
 
       - name: Cleanup key
         if: always()

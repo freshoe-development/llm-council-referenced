@@ -27,16 +27,19 @@ It should return:
 
 ## Step 1 — The token (one time)
 
-Protected requests need a secret token named `LLM_COUNCIL_API_TOKEN`. It is
-stored in the `.env` file on the server — you do not memorize it.
+Protected requests need a secret token (`LLM_COUNCIL_API_TOKEN`), stored in the
+server's `.env`. Retrieve it **yourself** over SSH and keep it somewhere safe (a
+password manager, or a shell environment variable) — avoid asking a chat agent
+to read secrets, since they can leak into logs or transcripts.
 
-Tell your local Claude session, once per session:
+```bash
+ssh <user>@srv1357811.hstgr.cloud \
+  'grep -E "^LLM_COUNCIL_API_TOKEN=" ~/llm-council-referenced/.env'
+# copy the value after the '=' and keep it locally, e.g.:
+export COUNCIL_TOKEN='paste-the-value-here'
+```
 
-> Read the token `LLM_COUNCIL_API_TOKEN` from `~/llm-council-referenced/.env`
-> on the server, and use it on every request to the council tool.
-
-The token is fixed — fetched once, reused on every request. A new session means
-you give this instruction once more.
+The token is fixed — capture it once and reuse it on every request.
 
 ## Step 2 — Ask a question (every time)
 
@@ -54,10 +57,10 @@ If you prefer a direct call from a terminal:
 
 ```bash
 curl -X POST https://council.72-61-193-40.nip.io/v1/council/run \
-  -H "Authorization: Bearer <the token>" \
+  -H "Authorization: Bearer $COUNCIL_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"prompt":"<your question>"}'
 ```
 
-> Note: `<the token>` is the value of `LLM_COUNCIL_API_TOKEN` from the server's
-> `.env`. Never paste the token into chat or commit it to git.
+> Note: `$COUNCIL_TOKEN` is the value of `LLM_COUNCIL_API_TOKEN` you captured
+> above. Never paste the token into chat or commit it to git.

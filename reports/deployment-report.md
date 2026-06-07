@@ -9,10 +9,14 @@
 ## 1. Summary
 
 Prepared a controlled, reversible Docker deployment of the forked LLM Council
-project for a Hostinger VPS. All deployment artifacts (production compose file,
-deploy/healthcheck/rollback scripts, env template, agent runbook) were added on a
-dedicated branch and validated locally. The live deployment to the VPS has **not**
-been performed yet — it is gated on user approval and SSH access (see §9).
+project for a Hostinger VPS, then deployed and secured it. All artifacts
+(production compose file, deploy/healthcheck/rollback scripts, env template,
+agent runbook) were added on a dedicated branch and validated locally first.
+The service is now **live over HTTPS** at `https://council.72-61-193-40.nip.io`
+(Caddy + Let's Encrypt), bound to `127.0.0.1:8000`, with Bearer auth on
+`/v1/council/*` — verified externally and on-box (see §12 for the authoritative
+live state). Sections §6–§11 below describe the initial, pre-hardening state and
+are superseded by §12.
 
 ## 2. Branch used
 

@@ -43,6 +43,12 @@ for var in OPENROUTER_API_KEY LLM_COUNCIL_API_TOKEN; do
     die "Required variable ${var} is missing or empty in .env"
   fi
 done
+# Reject the placeholder values shipped in .env.example so a half-configured
+# .env fails fast with a clear message instead of later at runtime.
+if grep -qE "^OPENROUTER_API_KEY=your-openrouter-api-key-here$" .env \
+   || grep -qE "^LLM_COUNCIL_API_TOKEN=your-strong-random-token-here$" .env; then
+  die ".env still contains placeholder values from .env.example — set real secrets."
+fi
 log "Pre-flight OK (.env present, required variables detected)."
 
 mkdir -p "$STATE_DIR"
@@ -56,7 +62,13 @@ log "Recorded current commit for rollback: ${CURRENT_COMMIT}"
 log "Fetching origin/${DEPLOY_BRANCH} ..."
 git fetch --tags origin "$DEPLOY_BRANCH"
 git checkout "$DEPLOY_BRANCH"
-git pull --ff-only origin "$DEPLOY_BRANCH"
+# Only fast-forward when on a branch; deploying a tag or commit SHA leaves a
+# detached HEAD where 'git pull' is meaningless and would fail.
+if git symbolic-ref -q HEAD >/dev/null; then
+  git pull --ff-only origin "$DEPLOY_BRANCH"
+else
+  log "Detached HEAD (tag or SHA) — skipping git pull."
+fi
 NEW_COMMIT="$(git rev-parse HEAD)"
 log "Deploying commit: ${NEW_COMMIT}"
 
