@@ -1,6 +1,7 @@
 # Deployment Report — LLM Council on Hostinger VPS
 
-> Status: **Artifacts prepared & validated locally. Live VPS deploy PENDING approval + SSH access.**
+> Status: **DEPLOYED on VPS — app running, local healthcheck OK. Exposure is
+> INSECURE (direct HTTP on :8000, no TLS) — hardening pending.**
 > Last updated: 2026-06-07
 
 ## 1. Summary
@@ -63,14 +64,19 @@ Secrets live only in `.env` on the server (git-ignored). Never committed.
 
 ## 6. Server changes made
 
-**None yet.** No SSH, no firewall, no reverse proxy, no DNS changes performed.
-All such changes are behind the approval gate (see `AGENTS.md`).
+Deploy executed on the VPS by the Hostinger agent (Kodee), not from this sandbox.
+- Container built and started from `hostinger-deploy` @ `bdd7977`.
+- Port **8000 opened directly** to the public internet (`BIND_ADDR=0.0.0.0` style),
+  **no reverse proxy, no TLS**. This was not the recommended default and is a
+  security gap (see §9).
+- No DNS change (uses the provider hostname `srv1357811.hstgr.cloud`).
 
 ## 7. Current app URL / port
 
-- Local validation: `http://127.0.0.1:8000` (health verified)
-- VPS: **not deployed yet.** Planned: container port **8000**, bound to
-  `127.0.0.1` by default; public access only via a reverse proxy + TLS (pending).
+- Live: **http://srv1357811.hstgr.cloud:8000** (plain HTTP, port 8000).
+- Health path: `/health`. Protected API: `/v1/council/run` (Bearer token).
+- Not independently reachable from the build sandbox (outbound :8000 blocked);
+  health confirmed via on-server `healthcheck.sh` = OK (operator-reported).
 
 ## 8. Test results
 
@@ -83,17 +89,24 @@ All such changes are behind the approval gate (see `AGENTS.md`).
 | `/health` responds | PASS |
 | Healthcheck script | PASS |
 | Auth gate enforces token | PASS (401) |
-| Full Docker build in sandbox | BLOCKED (env TLS proxy; will run on VPS) |
-| Live VPS deploy | PENDING |
+| Full Docker build in sandbox | BLOCKED (env TLS proxy) |
+| Live VPS build (after fix) | PASS (operator-reported) |
+| Live VPS deploy + healthcheck | PASS (operator-reported, `bdd7977`) |
+| External reachability from sandbox | N/A (outbound :8000 blocked) |
+| TLS / secure exposure | FAIL — plain HTTP on :8000 |
 
 ## 9. Known issues / blockers
 
-1. **No SSH access from the build environment** — live deploy requires the user
-   to provide secure VPS access. SSH client is also not installed in the sandbox.
-2. **Docker build blocked in sandbox** by the TLS-intercepting network proxy
-   (PyPI SSL failure). Will succeed on the VPS with normal egress.
-3. **Reverse proxy / TLS not configured** — required before public exposure.
-   Behind the approval gate.
+1. **INSECURE EXPOSURE (high):** API served over plain **HTTP on :8000** with no
+   TLS. `LLM_COUNCIL_API_TOKEN` and all request/response bodies travel in
+   cleartext and are interceptable. Port is open to the whole internet.
+   → Fix: reverse proxy (Caddy/nginx) + Let's Encrypt TLS, firewall to 80/443,
+   rebind app to `127.0.0.1`.
+2. **Leaked OpenRouter key (high):** the key was pasted into chat/screenshot
+   during setup → must be **rotated** at openrouter.ai and updated in `.env`.
+3. **No independent external verification** from the sandbox (outbound :8000 and
+   :22 blocked by network policy). Live health is operator-reported.
+4. Build regression (VERSION arg) — fixed in `bdd7977`.
 
 ## 10. Rollback instructions
 
@@ -105,9 +118,8 @@ All such changes are behind the approval gate (see `AGENTS.md`).
 
 ## 11. Next recommended action
 
-1. Obtain user approval + secure SSH access to the Hostinger VPS.
-2. On the VPS: install Docker, clone the fork, checkout `hostinger-deploy`,
-   create `.env` from `.env.example` (fill secrets), run `./scripts/deploy.sh`.
-3. Validate (container up, `/health`, logs, restart, rollback).
-4. With approval: add nginx/Caddy reverse proxy + TLS + firewall (allow 80/443).
-5. Update this report with live results.
+1. **Secure the exposure** (highest priority): put Caddy/nginx + TLS in front,
+   rebind the app to `127.0.0.1`, firewall to allow only 80/443.
+2. **Rotate** the leaked OpenRouter key; update `.env`; redeploy.
+3. Re-test `/health` over HTTPS and the auth gate.
+4. Confirm restart persistence and the `rollback.sh` path on the VPS.
