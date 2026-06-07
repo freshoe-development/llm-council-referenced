@@ -60,10 +60,6 @@ git pull --ff-only origin "$DEPLOY_BRANCH"
 NEW_COMMIT="$(git rev-parse HEAD)"
 log "Deploying commit: ${NEW_COMMIT}"
 
-# Stamp the image version from git so /version is meaningful inside the container.
-export APP_VERSION="$(git describe --tags --always 2>/dev/null || echo 0.0.0.dev0)"
-log "Image version: ${APP_VERSION}"
-
 # --- Build & start ----------------------------------------------------------
 log "Building image ..."
 "${COMPOSE[@]}" build

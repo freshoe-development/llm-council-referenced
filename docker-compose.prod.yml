@@ -21,8 +21,6 @@ services:
     build:
       context: .
       dockerfile: deploy/railway/Dockerfile
-      args:
-        VERSION: ${APP_VERSION:-0.0.0.dev0}
     image: llm-council:prod
     container_name: llm-council
     env_file:

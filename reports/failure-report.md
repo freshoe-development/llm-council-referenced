@@ -5,6 +5,28 @@ at the top.
 
 ---
 
+## 2026-06-07 — VPS Docker build failed at `pip install` (invalid version)
+
+- **What happened:** On the Hostinger VPS, `./scripts/deploy.sh` failed during
+  the image build at `Dockerfile:26` (`RUN pip install --no-cache-dir ".[http]"`,
+  exit code 1). No container started; `healthcheck.sh` then failed 10/10 and
+  `docker compose ps` was empty.
+- **Cause:** Regression introduced in the first deploy commit. `deploy.sh` set
+  `APP_VERSION=$(git describe --tags --always)` and passed it as the
+  `VERSION` build-arg → `SETUPTOOLS_SCM_PRETEND_VERSION`. On the VPS clone this
+  resolved to a bare commit hash (e.g. `5bc5542`), which is not a valid PEP 440
+  version, so hatch-vcs/hatchling aborted the package build. Independent of
+  network. (NB: this was NOT a missing-secret issue — the API key is only needed
+  at runtime, after a successful build.)
+- **Impact:** Deploy could not produce an image on the VPS.
+- **Resolution:** Removed the `VERSION` build-arg override from
+  `docker-compose.prod.yml` and the `APP_VERSION`/`git describe` lines from
+  `deploy.sh` and `rollback.sh`, restoring the Dockerfile's known-good default
+  (`0.0.0.dev0`). Re-validated: compose config valid, scripts syntax OK.
+- **Status:** Fixed on `hostinger-deploy`. Re-pull + re-run required on the VPS.
+
+---
+
 ## 2026-06-07 — Docker build blocked in build sandbox (PyPI SSL)
 
 - **What happened:** `docker compose -f docker-compose.prod.yml build` failed at

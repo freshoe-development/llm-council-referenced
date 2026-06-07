@@ -31,8 +31,7 @@ log "Rolling back to: ${TARGET}"
 git fetch --tags origin || true
 git checkout "$TARGET"
 
-export APP_VERSION="$(git describe --tags --always 2>/dev/null || echo 0.0.0.dev0)"
-log "Rebuilding image (${APP_VERSION}) ..."
+log "Rebuilding image ..."
 "${COMPOSE[@]}" build
 "${COMPOSE[@]}" up -d
 
