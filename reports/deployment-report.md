@@ -178,3 +178,14 @@ changes were additive and non-disruptive.
   remain attached but only take effect on a rebuild.
 - Flagged (out of scope): Hermes chat root (`:8642`) returns 502 (gateway not
   listening). Not caused by this work.
+
+## 13. Config change — chairman model (2026-06-07)
+
+- Changed `llm_council.yaml` → `council.chairman: openai/gpt-5.5-pro`
+  (was the built-in default `google/gemini-3.1-pro-preview`). Controls the
+  Stage 3 synthesizer only; council members unchanged.
+- `openai/gpt-5.5-pro` is the only GPT-5.5 id present in the registry.
+- Committed to `hostinger-deploy` (`85c95f4`). **Not live** until a pull +
+  `docker compose -f docker-compose.prod.yml up -d` on the VPS.
+- Not verified from sandbox that the id resolves on OpenRouter — confirm after
+  redeploy.
