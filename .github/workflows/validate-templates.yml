@@ -64,6 +64,12 @@ jobs:
           # v0.19.2-15-g8a1d729 -> 0.19.2.dev15
           # v0.19.2 -> 0.19.2
           VERSION=$(echo "$RAW_VERSION" | sed -E 's/^v//; s/-([0-9]+)-g[a-f0-9]+$/.dev\1/; s/-dirty$/.dirty/')
+          # No tags reachable (e.g. on forks): git describe --always returns a
+          # bare commit hash, which is not valid PEP 440 and breaks hatch-vcs.
+          # Fall back to a dev version with the hash as a local segment.
+          if printf '%s' "$RAW_VERSION" | grep -qE '^[0-9a-f]{7,40}$'; then
+            VERSION="0.0.0+g${RAW_VERSION}"
+          fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Raw: ${RAW_VERSION} -> PEP 440: ${VERSION}"
 
@@ -101,6 +107,12 @@ jobs:
           # v0.19.2-15-g8a1d729 -> 0.19.2.dev15
           # v0.19.2 -> 0.19.2
           VERSION=$(echo "$RAW_VERSION" | sed -E 's/^v//; s/-([0-9]+)-g[a-f0-9]+$/.dev\1/; s/-dirty$/.dirty/')
+          # No tags reachable (e.g. on forks): git describe --always returns a
+          # bare commit hash, which is not valid PEP 440 and breaks hatch-vcs.
+          # Fall back to a dev version with the hash as a local segment.
+          if printf '%s' "$RAW_VERSION" | grep -qE '^[0-9a-f]{7,40}$'; then
+            VERSION="0.0.0+g${RAW_VERSION}"
+          fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Raw: ${RAW_VERSION} -> PEP 440: ${VERSION}"
 
