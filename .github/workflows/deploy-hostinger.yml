@@ -1,0 +1,71 @@
+# Deploy to Hostinger VPS over SSH.
+#
+# Manual, controlled deploy: runs scripts/deploy.sh on the server via SSH.
+# The SSH key never lives in the repo — it is read from GitHub Actions secrets.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   SSH_PRIVATE_KEY  - the private key whose public half is in the VPS authorized_keys
+#   SSH_HOST         - e.g. srv1357811.hstgr.cloud
+#   SSH_USER         - e.g. root
+# Optional:
+#   SSH_PORT         - defaults to 22
+# Optional repository variable:
+#   APP_DIR          - path to the checkout on the server (default: ~/llm-council-referenced)
+
+name: Deploy to Hostinger VPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or tag to deploy"
+        required: true
+        default: "hostinger-deploy"
+
+concurrency:
+  group: hostinger-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SSH_PRIVATE_KEY:-}" ] || [ -z "${SSH_HOST:-}" ]; then
+            echo "::error::Missing required secrets SSH_PRIVATE_KEY and/or SSH_HOST"
+            exit 1
+          fi
+          PORT="${SSH_PORT:-22}"
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy over SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          APP_DIR: ${{ vars.APP_DIR }}
+          REF: ${{ github.event.inputs.ref }}
+        run: |
+          set -euo pipefail
+          PORT="${SSH_PORT:-22}"
+          USER="${SSH_USER:-root}"
+          DIR="${APP_DIR:-~/llm-council-referenced}"
+          echo "Deploying ref '${REF}' to ${USER}@${SSH_HOST}:${DIR}"
+          ssh -p "$PORT" -o BatchMode=yes "${USER}@${SSH_HOST}" \
+            "set -e; cd ${DIR}; git fetch origin '${REF}'; git checkout '${REF}'; git pull --ff-only origin '${REF}' || true; DEPLOY_BRANCH='${REF}' ./scripts/deploy.sh"
+
+      - name: Cleanup key
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519
